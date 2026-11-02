@@ -1,0 +1,376 @@
+#include <WiFi.h>
+#include <WebServer.h>
+
+
+// ==========================================
+// DATOS DE LA RED WIFI
+// ==========================================
+const char* ssid = "iPhone de Gonza";
+const char* password = "chechula2";
+
+
+// ==========================================
+// SERVIDOR WEB
+// ==========================================
+WebServer server(80);
+
+
+// ==========================================
+// LED INTERNO
+// ==========================================
+#ifndef LED_BUILTIN
+#define LED_BUILTIN 2
+#endif
+
+
+bool ledState = false;
+
+
+// ==========================================
+// PAGINA WEB - SMART CONTROL
+// ==========================================
+const char pagina[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+  <title>ESP32 | Smart Control</title>
+
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #101025, #20204a, #111827);
+      color: white;
+      min-height: 100vh;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+
+    .contenedor {
+      width: 100%;
+      max-width: 380px;
+      text-align: center;
+    }
+
+
+    .icono {
+      font-size: 55px;
+      margin-bottom: 10px;
+      filter: drop-shadow(0 0 15px #8b5cf6);
+    }
+
+
+    h1 {
+      font-size: 27px;
+      margin-bottom: 8px;
+      letter-spacing: 1px;
+    }
+
+
+    .subtitulo {
+      color: #a5b4fc;
+      font-size: 14px;
+      margin-bottom: 30px;
+    }
+
+
+    .tarjeta {
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(167, 139, 250, 0.35);
+      border-radius: 25px;
+      padding: 30px 22px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(10px);
+    }
+
+
+    .etiqueta {
+      color: #c4b5fd;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+
+    .luz {
+      width: 100px;
+      height: 100px;
+      margin: 25px auto;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 45px;
+      transition: 0.3s;
+    }
+
+
+    .luz.encendida {
+      background: rgba(34, 197, 94, 0.18);
+      border: 2px solid #4ade80;
+      box-shadow: 0 0 35px rgba(74, 222, 128, 0.4);
+    }
+
+
+    .luz.apagada {
+      background: rgba(148, 163, 184, 0.1);
+      border: 2px solid #64748b;
+      box-shadow: 0 0 20px rgba(100, 116, 139, 0.15);
+    }
+
+
+    .estado {
+      font-size: 23px;
+      font-weight: bold;
+      margin: 10px 0;
+    }
+
+
+    .estado.encendido {
+      color: #4ade80;
+    }
+
+
+    .estado.apagado {
+      color: #94a3b8;
+    }
+
+
+    .descripcion {
+      color: #a1a1aa;
+      font-size: 13px;
+      margin-bottom: 25px;
+    }
+
+
+    button {
+      width: 100%;
+      padding: 17px;
+      border: none;
+      border-radius: 14px;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+
+    button:hover {
+      transform: translateY(-2px);
+      filter: brightness(1.12);
+    }
+
+
+    button:active {
+      transform: scale(0.97);
+    }
+
+
+    button.encendida {
+      background: linear-gradient(90deg, #7c3aed, #6366f1);
+      box-shadow: 0 5px 20px rgba(124, 58, 237, 0.3);
+    }
+
+
+    button.encendido {
+      background: linear-gradient(90deg, #7c3aed, #6366f1);
+      box-shadow: 0 5px 20px rgba(124, 58, 237, 0.3);
+    }
+
+
+    button.apagado {
+      background: linear-gradient(90deg, #0891b2, #2563eb);
+      box-shadow: 0 5px 20px rgba(37, 99, 235, 0.3);
+    }
+
+
+    .pie {
+      margin-top: 25px;
+      color: #71717a;
+      font-size: 12px;
+    }
+
+
+    .conexion {
+      color: #4ade80;
+      margin-top: 12px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+
+
+<body>
+
+
+  <div class="contenedor">
+
+
+    <div class="icono">&#9889;</div>
+
+
+    <h1>SMART CONTROL</h1>
+    <div class="subtitulo">SISTEMA DOMOTICO - ESP32</div>
+
+
+    <div class="tarjeta">
+
+
+      <div class="etiqueta">Iluminacion inteligente</div>
+
+
+      <div class="luz %CLASE%">
+        %ICONO%
+      </div>
+
+
+      <div class="estado %CLASE%">
+        %ESTADO%
+      </div>
+
+
+      <div class="descripcion">
+        Controla la iluminacion desde tu celular
+      </div>
+
+
+      <form action="/toggle" method="GET">
+        <button class="%CLASE%">
+          %BOTON%
+        </button>
+      </form>
+
+
+      <div class="conexion">&#9679; SISTEMA CONECTADO</div>
+
+
+    </div>
+
+
+    <div class="pie">
+      SMART HOME - CONTROL LOCAL
+    </div>
+
+
+  </div>
+
+
+</body>
+</html>
+)rawliteral";
+
+
+// ==========================================
+// MOSTRAR PAGINA
+// ==========================================
+void mostrarPagina() {
+
+
+  String html = pagina;
+
+
+  if (ledState) {
+    html.replace("%ESTADO%", "ENCENDIDO");
+    html.replace("%CLASE%", "encendida");
+    html.replace("%BOTON%", "APAGAR ILUMINACION");
+    html.replace("%ICONO%", "&#9728;");
+  }
+  else {
+    html.replace("%ESTADO%", "APAGADO");
+    html.replace("%CLASE%", "apagado");
+    html.replace("%BOTON%", "ENCENDER ILUMINACION");
+    html.replace("%ICONO%", "&#9790;");
+  }
+
+
+  server.send(200, "text/html; charset=UTF-8", html);
+}
+
+
+// ==========================================
+// ENCENDER / APAGAR LED
+// ==========================================
+void cambiarLED() {
+
+
+  ledState = !ledState;
+
+
+  digitalWrite(LED_BUILTIN, ledState ? HIGH : LOW);
+
+
+  server.sendHeader("Location", "/");
+  server.send(303);
+}
+
+
+// ==========================================
+// CONFIGURACION
+// ==========================================
+void setup() {
+
+
+  Serial.begin(115200);
+
+
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
+
+
+  Serial.println();
+  Serial.println("Conectando a WiFi...");
+
+
+  WiFi.begin(ssid, password);
+
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+
+  Serial.println();
+  Serial.println("================================");
+  Serial.println("WiFi conectado correctamente");
+  Serial.print("IP del ESP32: ");
+  Serial.println(WiFi.localIP());
+  Serial.println("================================");
+
+
+  server.on("/", mostrarPagina);
+  server.on("/toggle", cambiarLED);
+
+
+  server.begin();
+
+
+  Serial.println("Servidor web iniciado");
+}
+
+
+// ==========================================
+// LOOP
+// ==========================================
+void loop() {
+
+
+  server.handleClient();
+
+
+}
